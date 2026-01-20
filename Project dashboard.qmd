@@ -1,0 +1,240 @@
+---
+title: "Is James Harden the System?"
+author: "Noah Kan"
+format: 
+  dashboard:
+    orientation: columns
+    embed-resources: true
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+#This code chunk is set to include = FALSE so that the code and output do not appear in the final dashboard
+
+library(tidyverse)
+library(scales)
+library(ggplot2)
+library(janitor)
+library(ggrepel)
+library(ggiraph)
+library(tidyverse)
+nba_teams <- tibble(
+  team_name = c(
+    "Boston Celtics", "Brooklyn Nets", "New York Knicks", "Philadelphia 76ers", "Toronto Raptors",
+    "Chicago Bulls", "Cleveland Cavaliers", "Detroit Pistons", "Indiana Pacers", "Milwaukee Bucks",
+    "Atlanta Hawks", "Charlotte Hornets", "Miami Heat", "Orlando Magic", "Washington Wizards",
+    "Denver Nuggets", "Minnesota Timberwolves", "Oklahoma City Thunder", "Portland Trail Blazers", "Utah Jazz",
+    "Golden State Warriors", "Los Angeles Clippers", "Los Angeles Lakers", "Phoenix Suns", "Sacramento Kings",
+    "Dallas Mavericks", "Houston Rockets", "Memphis Grizzlies", "New Orleans Pelicans", "San Antonio Spurs"
+  ),
+  acronym = c(
+    "BOS", "BKN", "NYK", "PHI", "TOR",
+    "CHI", "CLE", "DET", "IND", "MIL",
+    "ATL", "CHA", "MIA", "ORL", "WAS",
+    "DEN", "MIN", "OKC", "POR", "UTA",
+    "GSW", "LAC", "LAL", "PHX", "SAC",
+    "DAL", "HOU", "MEM", "NOP", "SAS"
+  )
+)
+write_csv(nba_teams, "nba_teams.csv")
+
+team<- read.csv("test.csv")
+
+team_analysis <-left_join(team, nba_teams, by = c("Team" = "team_name")) |>
+  clean_names()
+
+y1 <- 116.8
+y2 <- 111.9
+
+x1 = 111
+x2 = 110.4
+
+player <- read.csv("player.csv") |>
+  clean_names()
+
+player<- player |>
+  filter(g >= 41)|>
+  group_by(player) |>
+  filter(if(any(team == "2TM")) team == "2TM" else TRUE) %>%
+  ungroup()
+```
+
+# Introduction
+
+## Column {width =80%}
+
+Question: Is James Harden the System?\
+
+The 3 questions I wanted to further explore are:\
+
+- How is the Clippers offensive and Defensive rating affected by Harden being on the court?\
+- Does Harden's usage rate inflate his stats making him look better than he actually is?\
+- How does James Harden compare to other players around the league on his impact on his team?
+
+Context: At the start of 2024-2025 season, James Harden was asked what the clippers system was going to be for the upcoming season and he said "I am the system". I wanted to test his claim as to if he was the system throughout the 24-25 season. 
+
+Data cleaning: To clean the data I had to create 2 data sets one with team data and one with player data. For the team data, I first made a Acronym column that I could use to add acronyms to my graph. Then I imported the table that I wanted to use and left joined those data sets. For my Player data I first made sure there was only one of every player. Then I set a minimum of 41 games played as a cut off for players. 41 games is half of the NBA season so I felt like it was a fair line to draw for a players games played to be meaningful. 
+
+
+Sources: All my data is from [Basketball reference](https://www.basketball-reference.com/). I went around I collected my own data around the website whether it was on James Harden, Every Player, and Every team
+
+## Column {width = 20%}
+
+![James Harden (aka: The Beard)](Harden_pic.jpg)
+
+
+
+
+
+
+# At a team level
+## Column {width=70%}
+
+### Chart 1. NBA teams Offensive versus Defensive Rating
+
+```{r}
+
+#| label: ggiraph-plot
+
+set.seed(2)
+x <- team_analysis|>
+  ggplot(aes(x = d_rtg, y = o_rtg )) +
+  geom_point()+
+  geom_hline(yintercept = 114.5, linetype = "dotted")+
+  geom_vline(xintercept = 114.5, linetype = "dotted")+
+  geom_point(aes(x = x1, y = y1 ), color = "blue")+
+  annotate("text", x=109.8, y=116.8, label = "LAC w/ Harden", color = "blue")+
+  geom_point(aes(x = x2, y = y2), color = "red")+
+  annotate("text", x=109.2, y=111.8, label = "LAC wo/ Harden", color = "red")+
+  geom_text_repel(aes(label = acronym ), force = 2) + 
+  scale_x_reverse()+
+  annotate_interactive(
+    "rect", 
+    xmin = 114.5, xmax = Inf, ymin = -Inf, ymax = 114.5,
+    fill = "red", alpha = 0.1,
+    tooltip = "Poor Defense & Poor Offense",
+    data_id = "bottom_right"
+  ) +
+  annotate_interactive(
+    "rect",
+    xmin = Inf, xmax = 114.5, ymin = 114.5, ymax = Inf,
+    fill = "yellow", alpha = 0.1,
+    tooltip = "Good Offense, Poor Defense",
+    data_id = "top_right"
+  ) +
+  annotate_interactive(
+    "rect",
+    xmin = -Inf, xmax = 114.5, ymin = 114.5, ymax = Inf,
+    fill = "green", alpha = 0.1,
+    tooltip = "Elite: Good Defense & Good Offense",
+    data_id = "top_left"
+  ) +
+  annotate_interactive(
+    "rect",
+    xmin = -Inf, xmax = 114.5, ymin = -Inf, ymax = 114.5,
+    fill = "blue", alpha = 0.1,
+    tooltip = "Good Defense, Poor Offense",
+    data_id = "bottom_left"
+  )+ 
+  labs(title = "NBA teams Offensive Rating Versus Defensive Rating",
+       x = "Defensive rating",
+       y = "Offensive rating",
+       caption = "The lower the defensive rating the better the team is defensivly. While offensively the higher the rating the better the team.  ")
+girafe(ggobj = x, options = list(opts_sizing(rescale = FALSE)))
+```
+
+## Column {width=30%}
+
+Offensive Rating and Defensive Rating are Stats that measure the points scored and allowed per 100 possesions. This method allows us to adjust for pace and allows a fair comparison.
+
+# Looking at all Players
+
+## Column {width = 70%}
+
+### Chart 2. 
+```{r}
+
+player |>
+  ggplot(aes(x = ts, y = usg)) +
+  geom_point(aes(color = player == "James Harden")) +
+  geom_text_repel(
+    data = subset(player, player %in% c("James Harden")),
+    aes(label = player),
+    nudge_x = 0.03,              
+    nudge_y = 3,
+    color = "red",             
+    segment.color = "red",
+  ) +
+  geom_text_repel(
+    data = subset(player, player %in% c("Stephen Curry")),
+    aes(label = player),
+    nudge_y = 1.7,
+    nudge_x = 0.04
+  ) + 
+  geom_text_repel(
+    data = subset(player, player %in% c("LeBron James")),
+    aes(label = player),
+    nudge_x = 0.05,
+    nudge_y = 0.5
+  ) +
+  geom_text_repel(
+    data = subset(player, player %in% c("Alex Sarr")),
+    aes(label = player),
+    nudge_x = -0.005
+  ) +
+  geom_text_repel(
+    data = subset(player, player %in% c("Jaxson Hayes")),
+    aes(label = player),
+    nudge_y = -1
+  ) +
+  geom_text_repel(
+    data = subset(player, player %in% c("Gary Harris")),
+    aes(label = player),
+    nudge_y = -1
+  )+
+  scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red"), guide = "none")+
+  labs(title = "NBA Players True shooting Percentage versus Usage Rate",
+       y = "Usage rate (%)",
+       x = "True shooting Percentage")
+```
+
+### Chart 3.
+
+```{r}
+player |>
+  ggplot(aes(x = ws)) +
+  geom_histogram(aes(fill = after_stat(count)), bins = 25, color = "white") +
+  scale_fill_viridis_c(option = "plasma") +
+  theme_minimal()+
+  geom_vline(xintercept = 8.3, color = "red")+
+  annotate("text", x=11, y=30, label = "James Harden", color = "red")+
+  labs(title = "Histogram of NBA Players Win Shares",
+       x = "Win Shares")
+```
+
+## Column {width = 30%}
+
+The Scatter plot uses 2 variables, True shooting and Usage percentage. True shooting percentage is calculated by combining 2 pointers, 3 pointers, and free throws. Showing how many shots they make in all their shot attempts. Usage rate estimates the percent of possessions a player ends the play with a shot attempt. This shows their offensive load and importance for the team. The 2 combined allow for us to quickly see how a player is effecting the game for his team.
+
+The Histogram looks at a players win share. Win share is a statistics that explain how an individual is credited for team success. It is related to a teams win total and players can have positive or negative win shares based on their effect on their team.
+
+# Resources
+
+Resources I used: \
+- ChatGPT to help me clear through my errors by putting the error codes into chat and learning how to fix them  
+- RGallery to look at different ideas for my graph  
+- Stack Overflow to think of ideas on how to repel points away from each other  
+- Cheat sheets for ggplot, dplyr, and repel to understand how to use the packages and edit my code  
+
+Formal Citations: 
+
+OpenAI. (2025). ChatGPT (GPT-5, Thinking; Nov 10, 2025 version)
+[Large language model]. OpenAI. https://chat.openai.com/
+
+Holtz, Y. (n.d.). Help and inspiration for R charts. Retrieved from https://r-graph-gallery.com/ 
+
+Cheatsheets. (2023b). Retrieved from https://posit.co/resources/cheatsheets/ 
+
+
